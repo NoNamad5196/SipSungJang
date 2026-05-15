@@ -1,24 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useEffect, useState } from "react";
+import { signInWithRedirect, GoogleAuthProvider, getRedirectResult } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (!result) setLoading(false);
+        // 성공 시 AuthProvider가 /dashboard로 리다이렉트
+      })
+      .catch((e: unknown) => {
+        setError((e as { code?: string })?.code ?? String(e));
+        setLoading(false);
+      });
+  }, []);
 
   async function handleLogin() {
     setLoading(true);
     setError("");
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      // AuthProvider will redirect to /dashboard
-    } catch (e: unknown) {
-      const code = (e as { code?: string })?.code ?? String(e);
-      setError(code);
-      setLoading(false);
-    }
+    await signInWithRedirect(auth, new GoogleAuthProvider());
   }
 
   return (
