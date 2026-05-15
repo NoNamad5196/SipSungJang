@@ -14,8 +14,9 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
       // AuthProvider will redirect to /dashboard
-    } catch {
-      setError("로그인에 실패했습니다. 다시 시도해 주세요.");
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? String(e);
+      setError(code);
       setLoading(false);
     }
   }
