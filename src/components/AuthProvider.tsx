@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -14,11 +14,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     let unsubscribe: (() => void) | undefined;
 
-    async function init() {
-      // 리다이렉트 결과를 먼저 처리한 뒤 auth 상태 구독
-      try { await getRedirectResult(auth); } catch {}
+    // authStateReady(): 리다이렉트 결과 처리 포함, 인증 초기화가 완전히 끝날 때까지 대기
+    auth.authStateReady().then(() => {
       if (!active) return;
-
       unsubscribe = onAuthStateChanged(auth, (user) => {
         if (!active) return;
         if (!user && pathname !== "/") {
@@ -29,9 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setReady(true);
         }
       });
-    }
+    });
 
-    init();
     return () => {
       active = false;
       unsubscribe?.();
