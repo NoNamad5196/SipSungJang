@@ -25,6 +25,7 @@ export interface Game {
   intensity: PlayIntensity;
   current_goal: CurrentGoal | null;
   weekly_tasks: string[];
+  weekly_tasks_done?: boolean[];
   next_goal: string | null;
   urgency: Urgency;
   last_access: string | null;

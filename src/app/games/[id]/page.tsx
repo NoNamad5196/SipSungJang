@@ -28,11 +28,14 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   const [editingName, setEditingName] = useState(false);
+  const [editingIcon, setEditingIcon] = useState(false);
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState<string>("");
   const [intensity, setIntensity] = useState<PlayIntensity>("sub");
   const [currentGoal, setCurrentGoal] = useState<CurrentGoal | null>(null);
   const [urgency, setUrgency] = useState<Urgency>("medium");
   const [weeklyTasks, setWeeklyTasks] = useState<string[]>([]);
+  const [weeklyTasksDone, setWeeklyTasksDone] = useState<boolean[]>([]);
   const [newTask, setNewTask] = useState("");
   const [nextGoal, setNextGoal] = useState("");
   const [lastAccess, setLastAccess] = useState("");
@@ -53,14 +56,23 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
       if (!g) { router.push("/dashboard"); return; }
       setGame(g);
       setName(g.name);
+      setIcon(g.icon ?? "");
       setIntensity(g.intensity);
       setCurrentGoal(g.current_goal ?? null);
       setUrgency(g.urgency);
       setWeeklyTasks(g.weekly_tasks ?? []);
+      setWeeklyTasksDone(g.weekly_tasks_done ?? Array(g.weekly_tasks?.length ?? 0).fill(false));
       setNextGoal(g.next_goal ?? "");
-      setLastAccess(g.last_access ?? "");
       setPartyMemo(g.party_memo ?? "");
       setMemo(g.memo ?? "");
+
+      // auto-update last_access to today
+      const today = new Date().toISOString().slice(0, 10);
+      setLastAccess(today);
+      if (g.last_access !== today) {
+        repository.updateGame(id, { last_access: today });
+      }
+
       const chars = await repository.getCharacters(id);
       setCharacters(chars);
       setLoading(false);
@@ -79,6 +91,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
     saveTimerRef.current = setTimeout(async () => {
       await repository.updateGame(id, {
         weekly_tasks: weeklyTasks,
+        weekly_tasks_done: weeklyTasksDone,
         next_goal: nextGoal || null,
         last_access: lastAccess || null,
         current_goal: currentGoal ?? undefined,
@@ -96,12 +109,18 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [weeklyTasks, nextGoal, lastAccess, currentGoal, urgency, partyMemo, memo]);
+  }, [weeklyTasks, weeklyTasksDone, nextGoal, lastAccess, currentGoal, urgency, partyMemo, memo]);
 
   async function handleSaveName() {
     if (!name.trim()) return;
     await repository.updateGame(id, { name: name.trim() });
     setEditingName(false);
+  }
+
+  async function handleSaveIcon() {
+    const trimmed = icon.trim();
+    await repository.updateGame(id, { icon: trimmed || null });
+    setEditingIcon(false);
   }
 
   async function handleDeleteGame() {
@@ -110,14 +129,24 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
     router.push("/dashboard");
   }
 
-  async function addTask() {
+  function addTask() {
     if (!newTask.trim()) return;
-    setWeeklyTasks([...weeklyTasks, newTask.trim()]);
+    setWeeklyTasks((prev) => [...prev, newTask.trim()]);
+    setWeeklyTasksDone((prev) => [...prev, false]);
     setNewTask("");
   }
 
   function removeTask(idx: number) {
-    setWeeklyTasks(weeklyTasks.filter((_, i) => i !== idx));
+    setWeeklyTasks((prev) => prev.filter((_, i) => i !== idx));
+    setWeeklyTasksDone((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function toggleTask(idx: number) {
+    setWeeklyTasksDone((prev) => prev.map((v, i) => (i === idx ? !v : v)));
+  }
+
+  function resetTasksDone() {
+    setWeeklyTasksDone(weeklyTasks.map(() => false));
   }
 
   async function addCharacter() {
@@ -128,14 +157,14 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
       priority_rank: newCharRank,
       notes: newCharNotes.trim() || null,
     });
-    setCharacters([...characters, char]);
+    setCharacters((prev) => [...prev, char]);
     setNewCharName("");
     setNewCharNotes("");
   }
 
   async function deleteCharacter(charId: string) {
     await repository.deleteCharacter(charId);
-    setCharacters(characters.filter((c) => c.id !== charId));
+    setCharacters((prev) => prev.filter((c) => c.id !== charId));
   }
 
   if (loading) {
@@ -154,6 +183,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
   ];
 
   const charByRank = (rank: PriorityRank) => characters.filter((c) => c.priority_rank === rank);
+  const doneCount = weeklyTasksDone.filter(Boolean).length;
 
   return (
     <div className="min-h-screen">
@@ -167,7 +197,29 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
               ← 대시보드
             </Link>
             <div className="flex items-center gap-2 min-w-0">
-              {game?.icon && <span className="text-xl shrink-0">{game.icon}</span>}
+              {/* 이모지 편집 */}
+              {editingIcon ? (
+                <input
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  onBlur={handleSaveIcon}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveIcon()}
+                  autoFocus
+                  maxLength={4}
+                  placeholder="🎮"
+                  className="text-xl w-10 text-center shrink-0"
+                  style={{ padding: "2px", background: "var(--card)", border: "1px solid var(--accent)", borderRadius: 6 }}
+                />
+              ) : (
+                <button
+                  onClick={() => setEditingIcon(true)}
+                  className="text-xl shrink-0 hover:opacity-70 transition-opacity"
+                  title="아이콘 변경"
+                >
+                  {icon || "🎮"}
+                </button>
+              )}
+              {/* 이름 편집 */}
               {editingName ? (
                 <input
                   value={name}
@@ -299,24 +351,90 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-3" style={{ color: "var(--muted)" }}>이번 주 할 일</label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium" style={{ color: "var(--muted)" }}>
+                  이번 주 할 일
+                  {weeklyTasks.length > 0 && (
+                    <span className="ml-2 text-xs">
+                      {doneCount}/{weeklyTasks.length}
+                    </span>
+                  )}
+                </label>
+                {doneCount > 0 && (
+                  <button
+                    onClick={resetTasksDone}
+                    className="text-xs hover:text-red-400 transition-colors"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    체크 초기화
+                  </button>
+                )}
+              </div>
               <div className="space-y-2 mb-3">
-                {weeklyTasks.map((task, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg border" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-                    <span className="text-sm text-white flex-1">📌 {task}</span>
-                    <button onClick={() => removeTask(idx)} className="text-xs hover:text-red-400 transition-colors" style={{ color: "var(--muted)" }}>✕</button>
-                  </div>
-                ))}
+                {weeklyTasks.map((task, idx) => {
+                  const done = weeklyTasksDone[idx] ?? false;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+                      style={{ background: "var(--card)", borderColor: "var(--card-border)" }}
+                    >
+                      <button
+                        onClick={() => toggleTask(idx)}
+                        className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors"
+                        style={{
+                          borderColor: done ? "var(--accent)" : "var(--card-border)",
+                          background: done ? "var(--accent)" : "transparent",
+                        }}
+                      >
+                        {done && <span className="text-white text-xs leading-none">✓</span>}
+                      </button>
+                      <span
+                        className="text-sm flex-1 transition-colors"
+                        style={{
+                          color: done ? "var(--muted)" : "white",
+                          textDecoration: done ? "line-through" : "none",
+                        }}
+                      >
+                        {task}
+                      </span>
+                      <button
+                        onClick={() => removeTask(idx)}
+                        className="text-xs hover:text-red-400 transition-colors"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div className="flex gap-2">
-                <input type="text" value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="할 일 추가..." onKeyDown={(e) => e.key === "Enter" && addTask()} />
-                <button onClick={addTask} className="px-4 py-2 rounded-xl text-white text-sm font-medium shrink-0 transition-opacity hover:opacity-80" style={{ background: "var(--accent)" }}>추가</button>
+                <input
+                  type="text"
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  placeholder="할 일 추가..."
+                  onKeyDown={(e) => e.key === "Enter" && addTask()}
+                />
+                <button
+                  onClick={addTask}
+                  className="px-4 py-2 rounded-xl text-white text-sm font-medium shrink-0 transition-opacity hover:opacity-80"
+                  style={{ background: "var(--accent)" }}
+                >
+                  추가
+                </button>
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>다음 목표</label>
-              <input type="text" value={nextGoal} onChange={(e) => setNextGoal(e.target.value)} placeholder="다음에 달성할 목표..." />
+              <input
+                type="text"
+                value={nextGoal}
+                onChange={(e) => setNextGoal(e.target.value)}
+                placeholder="다음에 달성할 목표..."
+              />
             </div>
           </div>
         )}
@@ -329,17 +447,31 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                 <div key={rank}>
                   <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
                     {cfg.emoji} {cfg.label}
-                    {chars.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "var(--card-border)" }}>{chars.length}</span>}
+                    {chars.length > 0 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "var(--card-border)" }}>
+                        {chars.length}
+                      </span>
+                    )}
                   </h3>
                   {chars.length === 0 ? (
                     <p className="text-xs" style={{ color: "var(--card-border)" }}>없음</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {chars.map((c) => (
-                        <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                        <div
+                          key={c.id}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm"
+                          style={{ background: "var(--card)", borderColor: "var(--card-border)" }}
+                        >
                           <span className="text-white">{c.name}</span>
                           {c.notes && <span className="text-xs" style={{ color: "var(--muted)" }}>({c.notes})</span>}
-                          <button onClick={() => deleteCharacter(c.id)} className="text-xs hover:text-red-400 transition-colors" style={{ color: "var(--muted)" }}>✕</button>
+                          <button
+                            onClick={() => deleteCharacter(c.id)}
+                            className="text-xs hover:text-red-400 transition-colors"
+                            style={{ color: "var(--muted)" }}
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -350,16 +482,40 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
 
             <div className="rounded-xl border p-4 space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
               <p className="text-sm font-medium text-white">캐릭터 추가</p>
-              <input type="text" value={newCharName} onChange={(e) => setNewCharName(e.target.value)} placeholder="캐릭터 이름" />
+              <input
+                type="text"
+                value={newCharName}
+                onChange={(e) => setNewCharName(e.target.value)}
+                placeholder="캐릭터 이름"
+              />
               <div className="flex flex-wrap gap-1">
                 {(Object.entries(PRIORITY_RANK_CONFIG) as [PriorityRank, typeof PRIORITY_RANK_CONFIG[PriorityRank]][]).map(([rank, cfg]) => (
-                  <button key={rank} onClick={() => setNewCharRank(rank)} className="text-xs px-2 py-1 rounded-lg border transition-colors" style={{ borderColor: newCharRank === rank ? "var(--accent)" : "var(--card-border)", background: newCharRank === rank ? "rgba(124,58,237,0.15)" : "transparent", color: newCharRank === rank ? "white" : "var(--muted)" }}>
+                  <button
+                    key={rank}
+                    onClick={() => setNewCharRank(rank)}
+                    className="text-xs px-2 py-1 rounded-lg border transition-colors"
+                    style={{
+                      borderColor: newCharRank === rank ? "var(--accent)" : "var(--card-border)",
+                      background: newCharRank === rank ? "rgba(124,58,237,0.15)" : "transparent",
+                      color: newCharRank === rank ? "white" : "var(--muted)",
+                    }}
+                  >
                     {cfg.emoji} {cfg.label}
                   </button>
                 ))}
               </div>
-              <input type="text" value={newCharNotes} onChange={(e) => setNewCharNotes(e.target.value)} placeholder="부가 메모 (선택)" />
-              <button onClick={addCharacter} disabled={!newCharName.trim()} className="w-full py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50 transition-opacity hover:opacity-80" style={{ background: "var(--accent)" }}>
+              <input
+                type="text"
+                value={newCharNotes}
+                onChange={(e) => setNewCharNotes(e.target.value)}
+                placeholder="부가 메모 (선택)"
+              />
+              <button
+                onClick={addCharacter}
+                disabled={!newCharName.trim()}
+                className="w-full py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50 transition-opacity hover:opacity-80"
+                style={{ background: "var(--accent)" }}
+              >
                 캐릭터 추가
               </button>
             </div>
@@ -370,14 +526,26 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
           <div>
             <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>파티 구조 메모</label>
             <p className="text-xs mb-3" style={{ color: "var(--card-border)" }}>이 게임의 파티 기준을 자유롭게 기록하세요.</p>
-            <textarea value={partyMemo} onChange={(e) => setPartyMemo(e.target.value)} placeholder={"예:\n- 메인 딜러: 아리나\n- 버퍼: 코르니아\n- 힐러: 레나\n- 탱커: 테셀"} rows={10} style={{ resize: "vertical" }} />
+            <textarea
+              value={partyMemo}
+              onChange={(e) => setPartyMemo(e.target.value)}
+              placeholder={"예:\n- 메인 딜러: 아리나\n- 버퍼: 코르니아\n- 힐러: 레나\n- 탱커: 테셀"}
+              rows={10}
+              style={{ resize: "vertical" }}
+            />
           </div>
         )}
 
         {tab === "memo" && (
           <div>
             <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>기타 메모</label>
-            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="공략 링크, 이벤트 일정, 재화 계획 등 자유롭게..." rows={12} style={{ resize: "vertical" }} />
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="공략 링크, 이벤트 일정, 재화 계획 등 자유롭게..."
+              rows={12}
+              style={{ resize: "vertical" }}
+            />
           </div>
         )}
       </main>
