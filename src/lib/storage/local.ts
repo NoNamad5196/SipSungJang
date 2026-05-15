@@ -87,4 +87,18 @@ export class LocalRepository implements IRepository {
   async deleteCharacter(id: string): Promise<void> {
     this.writeChars(this.readChars().filter((c) => c.id !== id));
   }
+
+  async exportData(): Promise<import("./repository").BackupData> {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      games: this.readGames(),
+      characters: this.readChars(),
+    };
+  }
+
+  async importData(data: import("./repository").BackupData): Promise<void> {
+    this.writeGames(data.games ?? []);
+    this.writeChars(data.characters ?? []);
+  }
 }

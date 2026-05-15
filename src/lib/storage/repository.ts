@@ -3,6 +3,13 @@ import type { Game, Character } from "@/types";
 export type CreateGameInput = Omit<Game, "id" | "user_id" | "created_at" | "updated_at">;
 export type CreateCharacterInput = Omit<Character, "id" | "created_at">;
 
+export interface BackupData {
+  version: number;
+  exportedAt: string;
+  games: Game[];
+  characters: Character[];
+}
+
 export interface IRepository {
   getGames(): Promise<Game[]>;
   getGame(id: string): Promise<Game | null>;
@@ -13,4 +20,7 @@ export interface IRepository {
   getCharacters(gameId: string): Promise<Character[]>;
   addCharacter(data: CreateCharacterInput): Promise<Character>;
   deleteCharacter(id: string): Promise<void>;
+
+  exportData(): Promise<BackupData>;
+  importData(data: BackupData): Promise<void>;
 }

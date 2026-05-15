@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { repository } from "@/lib/storage";
@@ -15,6 +15,7 @@ import type { Game, Character, PlayIntensity, CurrentGoal, Urgency, PriorityRank
 import { cn } from "@/lib/utils";
 
 type Tab = "weekly" | "characters" | "party" | "memo";
+type SaveStatus = "idle" | "pending" | "saved";
 
 export default function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -24,7 +25,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
   const [characters, setCharacters] = useState<Character[]>([]);
   const [tab, setTab] = useState<Tab>("weekly");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState("");
@@ -41,6 +42,10 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
   const [newCharName, setNewCharName] = useState("");
   const [newCharRank, setNewCharRank] = useState<PriorityRank>("priority1");
   const [newCharNotes, setNewCharNotes] = useState("");
+
+  const hasLoadedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -59,33 +64,43 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
       const chars = await repository.getCharacters(id);
       setCharacters(chars);
       setLoading(false);
+      hasLoadedRef.current = true;
     }
     load();
   }, [id]);
 
-  async function save(partial: Partial<Omit<Game, "id" | "user_id" | "created_at">>) {
-    setSaving(true);
-    await repository.updateGame(id, partial);
-    setSaving(false);
-  }
+  // auto-save with 1.5s debounce
+  useEffect(() => {
+    if (!hasLoadedRef.current) return;
 
-  async function handleSaveWeekly() {
-    await save({
-      weekly_tasks: weeklyTasks,
-      next_goal: nextGoal || null,
-      last_access: lastAccess || null,
-      current_goal: currentGoal ?? undefined,
-      urgency,
-      intensity,
-    });
-  }
+    setSaveStatus("pending");
 
-  async function handleSaveParty() { await save({ party_memo: partyMemo }); }
-  async function handleSaveMemo() { await save({ memo }); }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      await repository.updateGame(id, {
+        weekly_tasks: weeklyTasks,
+        next_goal: nextGoal || null,
+        last_access: lastAccess || null,
+        current_goal: currentGoal ?? undefined,
+        urgency,
+        party_memo: partyMemo,
+        memo,
+      });
+
+      setSaveStatus("saved");
+
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 1500);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [weeklyTasks, nextGoal, lastAccess, currentGoal, urgency, partyMemo, memo]);
 
   async function handleSaveName() {
     if (!name.trim()) return;
-    await save({ name: name.trim() });
+    await repository.updateGame(id, { name: name.trim() });
     setEditingName(false);
   }
 
@@ -174,13 +189,21 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
               <IntensityBadge intensity={intensity} size="sm" />
             </div>
           </div>
-          <button
-            onClick={handleDeleteGame}
-            className="text-xs px-2 py-1 rounded-lg border transition-colors hover:border-red-500/50 shrink-0"
-            style={{ borderColor: "var(--card-border)", color: "var(--muted)" }}
-          >
-            삭제
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {saveStatus === "pending" && (
+              <span className="text-xs" style={{ color: "var(--muted)" }}>저장 중...</span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="text-xs text-green-400">✓ 저장됨</span>
+            )}
+            <button
+              onClick={handleDeleteGame}
+              className="text-xs px-2 py-1 rounded-lg border transition-colors hover:border-red-500/50"
+              style={{ borderColor: "var(--card-border)", color: "var(--muted)" }}
+            >
+              삭제
+            </button>
+          </div>
         </div>
       </header>
 
@@ -190,7 +213,10 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
           {(Object.entries(INTENSITY_CONFIG) as [PlayIntensity, typeof INTENSITY_CONFIG[PlayIntensity]][]).map(([key, cfg]) => (
             <button
               key={key}
-              onClick={async () => { setIntensity(key); await save({ intensity: key }); }}
+              onClick={async () => {
+                setIntensity(key);
+                await repository.updateGame(id, { intensity: key });
+              }}
               className="text-xs px-2 py-1 rounded-full border transition-colors"
               style={{
                 borderColor: intensity === key ? "var(--accent)" : "var(--card-border)",
@@ -292,10 +318,6 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
               <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>다음 목표</label>
               <input type="text" value={nextGoal} onChange={(e) => setNextGoal(e.target.value)} placeholder="다음에 달성할 목표..." />
             </div>
-
-            <button onClick={handleSaveWeekly} disabled={saving} className="w-full py-2.5 rounded-xl font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80" style={{ background: "var(--accent)" }}>
-              {saving ? "저장 중..." : "저장"}
-            </button>
           </div>
         )}
 
@@ -345,27 +367,17 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
         )}
 
         {tab === "party" && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>파티 구조 메모</label>
-              <p className="text-xs mb-3" style={{ color: "var(--card-border)" }}>이 게임의 파티 기준을 자유롭게 기록하세요.</p>
-              <textarea value={partyMemo} onChange={(e) => setPartyMemo(e.target.value)} placeholder={"예:\n- 메인 딜러: 아리나\n- 버퍼: 코르니아\n- 힐러: 레나\n- 탱커: 테셀"} rows={10} style={{ resize: "vertical" }} />
-            </div>
-            <button onClick={handleSaveParty} disabled={saving} className="w-full py-2.5 rounded-xl font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80" style={{ background: "var(--accent)" }}>
-              {saving ? "저장 중..." : "저장"}
-            </button>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>파티 구조 메모</label>
+            <p className="text-xs mb-3" style={{ color: "var(--card-border)" }}>이 게임의 파티 기준을 자유롭게 기록하세요.</p>
+            <textarea value={partyMemo} onChange={(e) => setPartyMemo(e.target.value)} placeholder={"예:\n- 메인 딜러: 아리나\n- 버퍼: 코르니아\n- 힐러: 레나\n- 탱커: 테셀"} rows={10} style={{ resize: "vertical" }} />
           </div>
         )}
 
         {tab === "memo" && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>기타 메모</label>
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="공략 링크, 이벤트 일정, 재화 계획 등 자유롭게..." rows={12} style={{ resize: "vertical" }} />
-            </div>
-            <button onClick={handleSaveMemo} disabled={saving} className="w-full py-2.5 rounded-xl font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80" style={{ background: "var(--accent)" }}>
-              {saving ? "저장 중..." : "저장"}
-            </button>
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted)" }}>기타 메모</label>
+            <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="공략 링크, 이벤트 일정, 재화 계획 등 자유롭게..." rows={12} style={{ resize: "vertical" }} />
           </div>
         )}
       </main>
