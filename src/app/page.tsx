@@ -1,28 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { signInWithRedirect, GoogleAuthProvider, getRedirectResult } from "firebase/auth";
+import { useState } from "react";
+import { signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (!result) setLoading(false);
-        // 성공 시 AuthProvider가 /dashboard로 리다이렉트
-      })
-      .catch((e: unknown) => {
-        setError((e as { code?: string })?.code ?? String(e));
-        setLoading(false);
-      });
-  }, []);
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
     setLoading(true);
-    setError("");
     await signInWithRedirect(auth, new GoogleAuthProvider());
   }
 
@@ -49,12 +35,8 @@ export default function LoginPage() {
             <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18z"/>
             <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/>
           </svg>
-          {loading ? "로그인 중..." : "Google로 로그인"}
+          {loading ? "이동 중..." : "Google로 로그인"}
         </button>
-
-        {error && (
-          <p className="text-sm text-red-400">{error}</p>
-        )}
       </div>
     </div>
   );
