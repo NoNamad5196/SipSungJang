@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { repository } from "@/lib/storage";
 import { IntensityBadge } from "@/components/IntensityBadge";
 import { GOAL_CONFIG, INTENSITY_ORDER } from "@/lib/constants";
 import type { Game } from "@/types";
@@ -11,33 +10,19 @@ import type { Game } from "@/types";
 export default function WeeklyPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/"); return; }
-
-      const { data } = await supabase
-        .from("games")
-        .select("*")
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: false });
-
-      if (data) setGames(data as Game[]);
+    repository.getGames().then((data) => {
+      setGames(data);
       setLoading(false);
-    }
-    load();
+    });
   }, []);
 
-  const activeGames = games.filter((g) => !["frozen", "abandoned"].includes(g.intensity));
-  const inactiveGames = games.filter((g) => ["frozen", "abandoned"].includes(g.intensity));
+  const activeGames = games
+    .filter((g) => !["frozen", "abandoned"].includes(g.intensity))
+    .sort((a, b) => INTENSITY_ORDER.indexOf(a.intensity) - INTENSITY_ORDER.indexOf(b.intensity));
 
-  const sorted = [...activeGames].sort(
-    (a, b) =>
-      INTENSITY_ORDER.indexOf(a.intensity) - INTENSITY_ORDER.indexOf(b.intensity)
-  );
+  const inactiveGames = games.filter((g) => ["frozen", "abandoned"].includes(g.intensity));
 
   return (
     <div className="min-h-screen">
@@ -68,7 +53,7 @@ export default function WeeklyPage() {
           </div>
         ) : (
           <>
-            {sorted.map((game) => {
+            {activeGames.map((game) => {
               const goal = game.current_goal ? GOAL_CONFIG[game.current_goal] : null;
               const hasTasks = game.weekly_tasks && game.weekly_tasks.length > 0;
 
@@ -94,19 +79,14 @@ export default function WeeklyPage() {
                     {hasTasks ? (
                       <ul className="space-y-1.5">
                         {game.weekly_tasks.map((task, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-2 text-sm text-white/80"
-                          >
+                          <li key={i} className="flex items-start gap-2 text-sm text-white/80">
                             <span className="shrink-0 mt-0.5">📌</span>
                             <span>{task}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm" style={{ color: "var(--card-border)" }}>
-                        이번 주 할 일 없음
-                      </p>
+                      <p className="text-sm" style={{ color: "var(--card-border)" }}>이번 주 할 일 없음</p>
                     )}
 
                     {game.next_goal && (
@@ -121,20 +101,14 @@ export default function WeeklyPage() {
 
             {inactiveGames.length > 0 && (
               <details className="group">
-                <summary
-                  className="text-sm cursor-pointer select-none list-none flex items-center gap-2 py-2"
-                  style={{ color: "var(--muted)" }}
-                >
+                <summary className="text-sm cursor-pointer select-none list-none flex items-center gap-2 py-2" style={{ color: "var(--muted)" }}>
                   <span className="group-open:rotate-90 inline-block transition-transform">▶</span>
                   냉동 / 방치 게임 ({inactiveGames.length}개)
                 </summary>
                 <div className="mt-3 space-y-2">
                   {inactiveGames.map((game) => (
                     <Link key={game.id} href={`/games/${game.id}`}>
-                      <div
-                        className="rounded-xl border p-3 opacity-60 hover:opacity-80 transition-opacity flex items-center justify-between"
-                        style={{ background: "var(--card)", borderColor: "var(--card-border)" }}
-                      >
+                      <div className="rounded-xl border p-3 opacity-60 hover:opacity-80 transition-opacity flex items-center justify-between" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
                         <div className="flex items-center gap-2">
                           {game.icon && <span>{game.icon}</span>}
                           <span className="text-sm text-white">{game.name}</span>

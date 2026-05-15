@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { repository } from "@/lib/storage";
 import { INTENSITY_CONFIG, GOAL_CONFIG, URGENCY_CONFIG } from "@/lib/constants";
 import type { PlayIntensity, CurrentGoal, Urgency } from "@/types";
 
@@ -11,7 +11,6 @@ const EMOJI_OPTIONS = ["🎮", "⚔️", "🏹", "🧙", "🔮", "🌸", "🐉",
 
 export default function NewGamePage() {
   const router = useRouter();
-  const supabase = createClient();
 
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🎮");
@@ -20,39 +19,26 @@ export default function NewGamePage() {
   const [urgency, setUrgency] = useState<Urgency>("medium");
   const [weeklyTask, setWeeklyTask] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/"); return; }
+    const game = await repository.createGame({
+      name,
+      icon,
+      intensity,
+      current_goal: currentGoal,
+      urgency,
+      weekly_tasks: weeklyTask.trim() ? [weeklyTask.trim()] : [],
+      next_goal: null,
+      last_access: null,
+      party_memo: null,
+      memo: null,
+      display_order: 0,
+    });
 
-    const weeklyTasks = weeklyTask.trim() ? [weeklyTask.trim()] : [];
-
-    const { data, error } = await supabase
-      .from("games")
-      .insert({
-        user_id: user.id,
-        name,
-        icon,
-        intensity,
-        current_goal: currentGoal,
-        urgency,
-        weekly_tasks: weeklyTasks,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push(`/games/${data.id}`);
+    router.push(`/games/${game.id}`);
   }
 
   return (
@@ -187,8 +173,6 @@ export default function NewGamePage() {
               placeholder="예: 이벤트 상점 핵심 보상 교환"
             />
           </div>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
 
           <div className="flex gap-3 pt-2">
             <Link

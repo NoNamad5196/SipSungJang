@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { repository } from "@/lib/storage";
 import { GameCard } from "@/components/GameCard";
 import { INTENSITY_ORDER } from "@/lib/constants";
 import type { Game } from "@/types";
@@ -11,39 +10,18 @@ import type { Game } from "@/types";
 export default function DashboardPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>("");
-  const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    async function loadGames() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/"); return; }
-      setUserEmail(user.email ?? "");
-
-      const { data } = await supabase
-        .from("games")
-        .select("*")
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: false });
-
-      if (data) setGames(data as Game[]);
+    repository.getGames().then((data) => {
+      setGames(data);
       setLoading(false);
-    }
-    loadGames();
+    });
   }, []);
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/");
-  }
 
   const grouped = INTENSITY_ORDER.reduce<Record<string, Game[]>>((acc, key) => {
     acc[key] = games.filter((g) => g.intensity === key);
     return acc;
   }, {} as Record<string, Game[]>);
-
-  const hasGames = games.length > 0;
 
   return (
     <div className="min-h-screen">
@@ -66,18 +44,11 @@ export default function DashboardPage() {
             </Link>
             <Link
               href="/games/new"
-              className="text-sm px-3 py-1.5 rounded-lg font-medium text-white transition-opacity hover:opacity-80"
+              className="text-sm px-3 py-1.5 rounded-xl font-medium text-white transition-opacity hover:opacity-80"
               style={{ background: "var(--accent)" }}
             >
               + 게임 추가
             </Link>
-            <button
-              onClick={handleSignOut}
-              className="text-xs px-2 py-1.5 rounded-lg transition-colors"
-              style={{ color: "var(--muted)" }}
-            >
-              로그아웃
-            </button>
           </div>
         </div>
       </header>
@@ -87,7 +58,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-center h-64">
             <p style={{ color: "var(--muted)" }}>불러오는 중...</p>
           </div>
-        ) : !hasGames ? (
+        ) : games.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <div className="text-5xl">🎯</div>
             <p className="text-white font-medium">아직 등록된 게임이 없어요</p>
