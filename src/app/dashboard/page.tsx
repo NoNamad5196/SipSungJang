@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
 import { repository } from "@/lib/storage";
 import { GameCard } from "@/components/GameCard";
 import { INTENSITY_ORDER } from "@/lib/constants";
@@ -180,6 +182,15 @@ export default function DashboardPage() {
             >
               + 게임 추가
             </Link>
+
+            <button
+              onClick={() => signOut(auth)}
+              className="text-xs px-2 py-1 rounded-lg border transition-colors hover:border-red-500/30"
+              style={{ borderColor: "var(--card-border)", color: "var(--muted)" }}
+              title="로그아웃"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
       </header>
