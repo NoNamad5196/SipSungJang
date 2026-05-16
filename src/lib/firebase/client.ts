@@ -18,10 +18,13 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// initializeAuth로 resolver를 미리 초기화 → signInWithPopup 호출 시
-// 비동기 init 없이 즉시 팝업이 열려 브라우저 팝업 차단 우회 가능.
-// 이미 초기화된 경우(hot reload) getAuth fallback.
+// SSR(서버)에서는 browser 전용 API 사용 불가 → typeof window 분기
 export const auth = (() => {
+  if (typeof window === "undefined") {
+    // 서버 환경: 기본 getAuth (실제로 서버에서 사용되지 않음)
+    try { return initializeAuth(app, {}); } catch { return getAuth(app); }
+  }
+  // 브라우저 환경: resolver 사전 초기화 → popup 즉시 열기 가능
   try {
     return initializeAuth(app, {
       persistence: browserLocalPersistence,

@@ -6,21 +6,22 @@ import { auth } from "@/lib/firebase/client";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleLogin() {
     setLoading(true);
-    setBlocked(false);
-    // resolver를 명시적으로 전달 → 이미 초기화된 resolver 재사용,
-    // 비동기 init 없이 즉시 팝업 open → 팝업 차단 우회
+    setError(null);
     signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver)
-      .catch((e: { code?: string }) => {
+      .catch((e: { code?: string; message?: string }) => {
         setLoading(false);
-        if (
-          e.code === "auth/popup-blocked" ||
-          e.code === "auth/popup-closed-by-user"
-        ) {
-          setBlocked(true);
+        const code = e?.code ?? "";
+        if (code === "auth/popup-blocked") {
+          setError("POPUP_BLOCKED");
+        } else if (code === "auth/popup-closed-by-user") {
+          setLoading(false); // 그냥 닫은 경우
+        } else {
+          // 에러 코드를 화면에 표시해서 원인 파악
+          setError(code || e?.message || "unknown");
         }
       });
   }
@@ -51,19 +52,38 @@ export default function LoginPage() {
           {loading ? "로그인 중..." : "Google로 로그인"}
         </button>
 
-        {blocked && (
+        {error === "POPUP_BLOCKED" && (
           <div
             className="rounded-xl border p-4 text-left space-y-2"
             style={{ background: "var(--card)", borderColor: "var(--card-border)" }}
           >
             <p className="text-sm font-medium text-white">팝업이 차단됐어요</p>
             <p className="text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
-              주소창 오른쪽 팝업 차단 아이콘을 클릭 →{" "}
-              <strong className="text-white">"항상 허용"</strong> 선택 후 다시 눌러주세요.
+              주소창 오른쪽 팝업 차단 아이콘 클릭 →{" "}
+              <strong className="text-white">"항상 허용"</strong> 후 다시 시도하세요.
             </p>
             <button
               onClick={handleLogin}
               className="w-full mt-2 py-2 rounded-lg text-sm font-medium text-white"
+              style={{ background: "var(--accent)" }}
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {error && error !== "POPUP_BLOCKED" && (
+          <div
+            className="rounded-xl border p-4 text-left"
+            style={{ background: "var(--card)", borderColor: "var(--card-border)" }}
+          >
+            <p className="text-sm font-medium text-white mb-1">로그인 오류</p>
+            <p className="text-xs font-mono" style={{ color: "var(--muted)" }}>
+              {error}
+            </p>
+            <button
+              onClick={handleLogin}
+              className="w-full mt-3 py-2 rounded-lg text-sm font-medium text-white"
               style={{ background: "var(--accent)" }}
             >
               다시 시도
