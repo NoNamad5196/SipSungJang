@@ -1,5 +1,10 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  initializeAuth,
+  getAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -12,5 +17,19 @@ const firebaseConfig = {
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// initializeAuth로 resolver를 미리 초기화 → signInWithPopup 호출 시
+// 비동기 init 없이 즉시 팝업이 열려 브라우저 팝업 차단 우회 가능.
+// 이미 초기화된 경우(hot reload) getAuth fallback.
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
+
 export const db = getFirestore(app);
