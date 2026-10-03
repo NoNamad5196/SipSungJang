@@ -1,15 +1,23 @@
+import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+import { JournalShell } from "@/components/JournalShell";
+export const metadata: Metadata = {
+  title: "SipSungJang — 나의 모험 수첩",
+  description:
+    "이번 주에 어떤 게임을 얼마나 챙겨야 하지? 여러 게임의 퀘스트, 캐릭터 육성, 파티를 한 권의 수첩에.",
+};
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="ko">
-      <head>
-        <title>씹성장 — 다중 가챠 게임 로드맵</title>
-        <meta name="description" content="여러 가챠 게임을 병행하는 사람을 위한 통합 성장 로드맵 툴" />
-      </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <JournalShell>{children}</JournalShell>
+        </AuthProvider>
       </body>
     </html>
   );

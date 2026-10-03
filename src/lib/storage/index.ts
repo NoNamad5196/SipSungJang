@@ -1,2 +1,2 @@
-import { FirestoreRepository } from "./firestore-repository";
-export const repository = new FirestoreRepository();
+export { LocalRepository } from "./local";
+export type { IRepository, BackupData } from "./repository";

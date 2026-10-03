@@ -1,0 +1,13 @@
+# Local credentials, generated artifacts and agent-only files stay on this device.
+.env*
+.git/
+.claude/
+.codex/
+.agents/
+.work/
+.next/
+node_modules/
+tests/
+docs/
+supabase/
+*.tsbuildinfo
