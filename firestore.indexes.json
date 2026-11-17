@@ -1,0 +1,104 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "franchise_id", "order": "ASCENDING" },
+        { "fieldPath": "start_date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "start_date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_game_id", "order": "ASCENDING" },
+        { "fieldPath": "paid_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source", "order": "ASCENDING" },
+        { "fieldPath": "paid_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "banners",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "game_id", "order": "ASCENDING" },
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "ends_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pulls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_banner_id", "order": "ASCENDING" },
+        { "fieldPath": "pulled_at", "order": "ASCENDING" },
+        { "fieldPath": "pull_session_id", "order": "ASCENDING" },
+        { "fieldPath": "pull_number", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "crawlSources",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "source_type", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "crawledPosts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "crawl_source_id", "order": "ASCENDING" },
+        { "fieldPath": "crawled_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventSuggestions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reminders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "remind_at", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "crawledPosts",
+      "fieldPath": "content",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "eventSuggestions",
+      "fieldPath": "raw_ai",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "payments",
+      "fieldPath": "raw_description",
+      "indexes": []
+    }
+  ]
+}

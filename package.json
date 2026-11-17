@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsc -p tsconfig.test.json && node --test tests/*.test.cjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-otakus \"node --test tests/firestore-rules.test.mjs\"",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src docs tests README.md"
   },
@@ -19,12 +20,14 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "firebase-tools": "^15.34.2",
     "prettier": "^3.9.6",
     "tailwindcss": "^4",
     "typescript": "^5"
