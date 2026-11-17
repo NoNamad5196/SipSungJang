@@ -34,23 +34,24 @@ npm start
 
 ## Firebase 계정 수첩
 
-기존 Firebase Auth/Firestore를 유지합니다. Supabase로 이전하지 않습니다.
+기존 Firebase Auth/Firestore를 유지하며, SipSungJang·OtakuHub·GachaGuard 세 서비스가 동일한 Firebase 프로젝트와 Google Auth `users/{uid}` 계정을 공유합니다. Supabase로 이전하지 않습니다.
 
 1. `.env.example`을 `.env.local`로 복사하고 기존 Firebase 웹 앱 설정을 넣습니다.
 2. 해당 Firebase 프로젝트에서 Google 로그인과 실행/배포 도메인을 설정합니다.
-3. Firestore 규칙이 로그인한 본인의 `users/{uid}`와 `games`, `characters`에만 접근을 허용하는지 확인합니다. 프런트엔드의 UID 검사만으로 보안 규칙을 대체할 수 없습니다.
+3. [OtakuS Firestore 계약 v1](docs/otakus-firestore-contract.md)을 기준으로 작성된 `firestore.rules`와 `firestore.indexes.json`이 본인의 `users/{uid}`(하위 `games`, `characters`, `gacha/main/*`, `hub/main/*`, `userFranchises`, `agentSignals`) 및 공개 카탈로그·일정(`games`, `franchises`, `events`) 접근 권한을 제어합니다. 로컬 에뮬레이터 규칙 검증은 `npm run test:rules`로 실행하며, 프런트엔드의 UID 검사만으로 보안 규칙을 대체할 수 없습니다.
 4. Google 로그인으로 기존 계정 기록을 엽니다. 기기 기록은 자동 업로드하지 않습니다. 필요한 기록만 백업 가져오기로 추가합니다.
 
-현재 작업에서는 운영 DB, 보안 규칙, 배포 설정을 변경하지 않았습니다. 실제 계정 로그인·Firestore 읽기/쓰기와 보안 규칙은 배포 전 별도 검증 대상입니다. 과거 `supabase/migrations/001_initial.sql`은 역사 자료이며 V2 설치 절차에서 실행하지 않습니다.
+현재 작업에서는 운영 DB와 배포 설정을 변경하지 않았습니다. 실제 계정 로그인·Firestore 읽기/쓰기와 보안 규칙 배포는 별도 검증 대상입니다. 과거 `supabase/migrations/001_initial.sql`은 역사 자료이며 V2 설치 절차에서 실행하지 않습니다.
 
 ## 공통 도메인과 연결 서비스
 
-`src/types/index.ts`의 User / GameMaster / Franchise / UserGame / UserProfile이 공통 계약입니다. `src/lib/catalog.ts`가 게임 ID의 단일 원본이며 공개 읽기 전용 `/api/catalog`로 제공합니다. 예를 들어 원신은 세 서비스 모두 `genshin-impact`를 사용합니다. 개인정보는 이 API에 포함하지 않습니다.
+`src/types/index.ts`의 User / GameMaster / Franchise / UserGame / UserProfile과 [docs/otakus-firestore-contract.md](docs/otakus-firestore-contract.md)가 SipSungJang, OtakuHub, GachaGuard 세 앱의 공통 데이터 계약(OtakuS Firestore Contract v1)입니다. `src/lib/catalog.ts`가 게임 ID의 단일 원본이며 공개 읽기 전용 `/api/catalog`로 제공합니다. 예를 들어 원신은 세 서비스 모두 `genshin-impact`를 사용합니다. 개인정보는 이 API에 포함하지 않습니다.
 
-`NEXT_PUBLIC_OTAKUHUB_URL`, `NEXT_PUBLIC_GACHAGUARD_URL`에 실제 HTTPS 주소를 넣고 다시 빌드하면 런처 링크가 활성화됩니다. 미설정 주소는 **연결 준비 중**으로 표시합니다. 두 서비스는 각각 이벤트/일정, 소비/예산을 담당하며 프런트엔드는 독립 저장소로 유지합니다.
+`NEXT_PUBLIC_OTAKUHUB_URL`, `NEXT_PUBLIC_GACHAGUARD_URL`에 실제 HTTPS 주소를 넣고 다시 빌드하면 사이드바와 설정 화면의 서비스 런처 링크가 활성화됩니다. 미설정 주소는 **연결 준비 중**으로 표시합니다. 두 서비스는 각각 이벤트/일정, 소비/예산을 담당하며 프런트엔드는 독립 저장소로 유지합니다.
 
 ## 문서와 후속 작업
 
+- [OtakuS Firestore 계약 v1](docs/otakus-firestore-contract.md)
 - [구현 계획과 재사용 판단](docs/redesign-v2-plan.md)
 - [공통 모델·V1 호환·백업 정책](docs/shared-domain.md)
 - [Figma 비교와 테스트 결과](docs/redesign-v2-qa.md)
