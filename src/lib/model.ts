@@ -1,4 +1,12 @@
-import type { Game, Character, Quest, UserProfile } from "../types/index";
+import type {
+  AgentSignal,
+  AgentSignalKind,
+  AgentSourceApp,
+  Character,
+  Game,
+  Quest,
+  UserProfile,
+} from "../types/index";
 import { resolveGame } from "./catalog";
 export const INTENSITIES = [
   "main",
@@ -14,6 +22,17 @@ export const PRIORITIES = [
   "favorite",
   "bad-investment",
   "complete",
+] as const;
+export const AGENT_SIGNAL_KINDS = [
+  "game_started",
+  "game_stopped",
+  "manual_sync",
+  "spending_alert",
+] as const;
+export const AGENT_SOURCE_APPS = [
+  "sipsungjang",
+  "gachaguard",
+  "otakuhub",
 ] as const;
 export const defaultProfile = (user_id = "local"): UserProfile => ({
   user_id,
@@ -215,5 +234,89 @@ export function normalizeProfile(value: unknown, userId: string): UserProfile {
       events: typeof r.events === "boolean" ? r.events : true,
       daily: typeof r.daily === "boolean" ? r.daily : false,
     },
+  };
+}
+function toIsoTimestamp(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const ms = Date.parse(trimmed);
+    return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+  }
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.toISOString() : null;
+  }
+  if (value && typeof value === "object") {
+    const maybeTimestamp = value as {
+      toDate?: () => unknown;
+      seconds?: unknown;
+      nanoseconds?: unknown;
+    };
+    if (typeof maybeTimestamp.toDate === "function") {
+      const converted = maybeTimestamp.toDate();
+      return converted instanceof Date && Number.isFinite(converted.getTime())
+        ? converted.toISOString()
+        : null;
+    }
+    if (
+      typeof maybeTimestamp.seconds === "number" &&
+      Number.isFinite(maybeTimestamp.seconds)
+    ) {
+      const nanos =
+        typeof maybeTimestamp.nanoseconds === "number" &&
+        Number.isFinite(maybeTimestamp.nanoseconds)
+          ? maybeTimestamp.nanoseconds
+          : 0;
+      const ms = maybeTimestamp.seconds * 1000 + Math.trunc(nanos / 1_000_000);
+      return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+    }
+  }
+  return null;
+}
+export function normalizeAgentSignal(
+  value: unknown,
+  id?: string,
+  now = new Date(),
+): AgentSignal | null {
+  const s = record(value);
+  const signalId = str(id ?? s.id).trim();
+  if (!signalId) return null;
+  if (!AGENT_SIGNAL_KINDS.includes(s.kind as AgentSignalKind)) return null;
+  if (!AGENT_SOURCE_APPS.includes(s.source_app as AgentSourceApp)) return null;
+  const occurredAt = toIsoTimestamp(s.occurred_at);
+  const receivedAt = toIsoTimestamp(s.received_at);
+  const expiresAt = toIsoTimestamp(s.expires_at);
+  if (!occurredAt || !receivedAt || !expiresAt) return null;
+  if (Date.parse(expiresAt) <= now.getTime()) return null;
+  const gameId =
+    typeof s.game_id === "string" && s.game_id.trim() ? s.game_id.trim() : null;
+  const userGameId =
+    typeof s.user_game_id === "string" && s.user_game_id.trim()
+      ? s.user_game_id.trim()
+      : null;
+  const message =
+    typeof s.message === "string" && s.message.trim()
+      ? s.message.trim().slice(0, 500)
+      : null;
+  const amount =
+    typeof s.amount === "number" && Number.isFinite(s.amount) && s.amount >= 0
+      ? Math.trunc(s.amount)
+      : null;
+  const currency =
+    typeof s.currency === "string" && s.currency.trim()
+      ? s.currency.trim().toUpperCase().slice(0, 12)
+      : null;
+  return {
+    id: signalId,
+    kind: s.kind as AgentSignalKind,
+    source_app: s.source_app as AgentSourceApp,
+    game_id: gameId,
+    user_game_id: userGameId,
+    occurred_at: occurredAt,
+    received_at: receivedAt,
+    expires_at: expiresAt,
+    message,
+    amount,
+    currency,
   };
 }

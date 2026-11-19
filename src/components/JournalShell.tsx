@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "./AuthProvider";
@@ -8,6 +8,7 @@ import { Editors } from "./Editors";
 import { Progress, Loading } from "./ui";
 import { percent, resetLabel, nextReset } from "@/lib/model";
 import { AppLauncher } from "./Settings";
+import { AgentSignalBar } from "./AgentSignalBar";
 
 const NAV = [
   ["/dashboard", "◆", "오늘의 여정"],
@@ -22,6 +23,7 @@ function Shell({ children }: { children: ReactNode }) {
     { games, profile, loading, busy, error, notice, reload } = useJournal();
   const [now, setNow] = useState<Date | null>(null),
     [launcher, setLauncher] = useState(false);
+  const launcherRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const tick = () => setNow(new Date());
     const initial = setTimeout(tick, 0);
@@ -31,6 +33,27 @@ function Shell({ children }: { children: ReactNode }) {
       clearInterval(timer);
     };
   }, []);
+  useEffect(() => {
+    if (!launcher) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (
+        launcherRef.current &&
+        e.target instanceof Node &&
+        !launcherRef.current.contains(e.target)
+      ) {
+        setLauncher(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLauncher(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [launcher]);
   const tasks = games.flatMap((g) => g.quests),
     done = tasks.filter((t) => t.done).length;
   const daily = tasks.filter((t) => t.type === "daily" && !t.done).length;
@@ -65,15 +88,26 @@ function Shell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="sidebar-bottom">
+        <div className="sidebar-bottom" ref={launcherRef}>
           <button
+            type="button"
             className="launcher-button"
             onClick={() => setLauncher((v) => !v)}
             aria-expanded={launcher}
+            aria-label="연결된 OtakuS 서비스"
           >
-            ⊞ 연결된 서비스 <span>⌃</span>
+            ⊞ 연결된 서비스 <span>{launcher ? "⌄" : "⌃"}</span>
           </button>
-          {launcher && <AppLauncher compact />}
+          {launcher && (
+            <>
+              <div
+                className="launcher-scrim"
+                aria-hidden="true"
+                onClick={() => setLauncher(false)}
+              />
+              <AppLauncher compact onNavigate={() => setLauncher(false)} />
+            </>
+          )}
           <div className="mini-progress">
             <div>
               <span>이번 주 진행</span>
@@ -162,6 +196,7 @@ function Shell({ children }: { children: ReactNode }) {
                 )}
               </div>
             )}
+          {!loading && <AgentSignalBar now={now} />}
           {loading ? <Loading /> : children}
         </main>
         <Editors />

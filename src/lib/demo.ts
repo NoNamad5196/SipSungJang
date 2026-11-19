@@ -5,7 +5,7 @@ import {
   defaultProfile,
 } from "./model";
 import type { BackupData } from "./storage/repository";
-import type { Game, Quest } from "../types/index";
+import type { AgentSignal, Game, Quest } from "../types/index";
 function quest(
   id: string,
   label: string,
@@ -185,4 +185,48 @@ export function demoData(): BackupData {
     characters,
     profile: defaultProfile(),
   };
+}
+export function demoAgentSignals(now = new Date()): AgentSignal[] {
+  const iso = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString();
+  return [
+    {
+      id: "demo-signal-game-started",
+      kind: "game_started",
+      source_app: "sipsungjang",
+      game_id: "genshin-impact",
+      user_game_id: "demo-genshin",
+      occurred_at: iso(-12 * 60_000),
+      received_at: iso(-12 * 60_000),
+      expires_at: iso(24 * 60 * 60_000),
+      message: "원신 모험 세션이 감지됐어요. 일일 의뢰와 레진 퀘스트를 확인해 보세요.",
+      amount: null,
+      currency: null,
+    },
+    {
+      id: "demo-signal-spending-alert",
+      kind: "spending_alert",
+      source_app: "gachaguard",
+      game_id: "honkai-star-rail",
+      user_game_id: "demo-starrail",
+      occurred_at: iso(-45 * 60_000),
+      received_at: iso(-45 * 60_000),
+      expires_at: iso(24 * 60 * 60_000),
+      message: "이번 달 설정한 가챠 예산의 85%에 도달했어요.",
+      amount: 55000,
+      currency: "KRW",
+    },
+    {
+      id: "demo-signal-manual-sync",
+      kind: "manual_sync",
+      source_app: "otakuhub",
+      game_id: "wuthering-waves",
+      user_game_id: "demo-wuwa",
+      occurred_at: iso(-3 * 60 * 60_000),
+      received_at: iso(-3 * 60 * 60_000),
+      expires_at: iso(24 * 60 * 60_000),
+      message: "명조 신규 이벤트 일정이 OtakuHub에서 동기화됐어요.",
+      amount: null,
+      currency: null,
+    },
+  ];
 }

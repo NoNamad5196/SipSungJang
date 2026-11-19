@@ -15,6 +15,7 @@
     "src/lib/catalog.ts",
     "src/lib/model.ts",
     "src/lib/demo.ts",
+    "src/lib/services.ts",
     "src/lib/storage/repository.ts",
     "src/lib/storage/local.ts"
   ]

@@ -8,7 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Character, Game, Quest, UserProfile } from "@/types";
+import type {
+  AgentSignal,
+  Character,
+  Game,
+  Quest,
+  UserProfile,
+} from "@/types";
 import { useSession } from "./AuthProvider";
 import { defaultProfile } from "@/lib/model";
 
@@ -23,6 +29,7 @@ interface JournalState {
   games: Game[];
   characters: Character[];
   profile: UserProfile;
+  agentSignals: AgentSignal[];
   loading: boolean;
   busy: boolean;
   error: string;
@@ -42,7 +49,8 @@ export function JournalProvider({ children }: { children: ReactNode }) {
   const { repository } = useSession();
   const [games, setGames] = useState<Game[]>([]),
     [characters, setCharacters] = useState<Character[]>([]),
-    [profile, setProfile] = useState(defaultProfile());
+    [profile, setProfile] = useState(defaultProfile()),
+    [agentSignals, setAgentSignals] = useState<AgentSignal[]>([]);
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -53,15 +61,17 @@ export function JournalProvider({ children }: { children: ReactNode }) {
   const fetchRecords = useCallback(async () => {
     const current = ++generation.current;
     try {
-      const [g, c, p] = await Promise.all([
+      const [g, c, p, signals] = await Promise.all([
         repository.getGames(),
         repository.getCharacters(),
         repository.getProfile(),
+        repository.listAgentSignals(10).catch(() => [] as AgentSignal[]),
       ]);
       if (generation.current !== current) return;
       setGames(g);
       setCharacters(c);
       setProfile(p);
+      setAgentSignals(signals);
       setError("");
     } finally {
       if (generation.current === current) setLoading(false);
@@ -120,6 +130,7 @@ export function JournalProvider({ children }: { children: ReactNode }) {
         games,
         characters,
         profile,
+        agentSignals,
         loading,
         busy,
         error,

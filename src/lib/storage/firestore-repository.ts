@@ -8,10 +8,22 @@ import {
   writeBatch,
   query,
   where,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { getFirebase } from "../firebase/client";
-import { normalizeGame, normalizeCharacter, normalizeProfile } from "../model";
-import type { Game, Character, UserProfile } from "../../types/index";
+import {
+  normalizeAgentSignal,
+  normalizeCharacter,
+  normalizeGame,
+  normalizeProfile,
+} from "../model";
+import type {
+  AgentSignal,
+  Character,
+  Game,
+  UserProfile,
+} from "../../types/index";
 import {
   mergeBackup,
   prepareCloudBackup,
@@ -34,6 +46,9 @@ export class FirestoreRepository implements IRepository {
   }
   private charsRef() {
     return collection(this.db, "users", this.uid, "characters");
+  }
+  private agentSignalsRef() {
+    return collection(this.db, "users", this.uid, "agentSignals");
   }
   async getGames() {
     const snap = await getDocs(this.gamesRef());
@@ -192,6 +207,20 @@ export class FirestoreRepository implements IRepository {
       { profile: normalizeProfile(profile, this.uid) },
       { merge: true },
     );
+  }
+  async listAgentSignals(max = 10): Promise<AgentSignal[]> {
+    const safeLimit = Math.min(50, Math.max(1, Math.trunc(max)));
+    const snap = await getDocs(
+      query(
+        this.agentSignalsRef(),
+        orderBy("received_at", "desc"),
+        limit(safeLimit),
+      ),
+    );
+    const now = new Date();
+    return snap.docs
+      .map((d) => normalizeAgentSignal(d.data(), d.id, now))
+      .filter((s): s is AgentSignal => s !== null);
   }
   async exportData(): Promise<BackupData> {
     const [games, characters, profile] = await Promise.all([

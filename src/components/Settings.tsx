@@ -3,45 +3,30 @@ import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { UserProfile } from "@/types";
 import { validateBackup, type BackupData } from "@/lib/storage/repository";
+import {
+  getOtakuSServices,
+  validUrl,
+  type OtakuSService,
+} from "@/lib/services";
 import { useSession } from "./AuthProvider";
 import { useJournal } from "./JournalProvider";
 import { Panel, SectionHeader, Modal } from "./ui";
 
-function validUrl(value?: string) {
-  try {
-    const url = new URL(value ?? "");
-    return url.protocol === "https:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-const SERVICES = [
-  {
-    name: "SipSungJang",
-    description: "육성 · 주간 목표 · 플레이 수첩",
-    icon: "✦",
-    color: "#c9a84c",
-    href: "/dashboard",
-  },
-  {
-    name: "OtakuHub",
-    description: "게임 · 서브컬처 이벤트와 일정",
-    icon: "◈",
-    color: "#6ab0e8",
-    href: validUrl(process.env.NEXT_PUBLIC_OTAKUHUB_URL),
-  },
-  {
-    name: "GachaGuard",
-    description: "소비 기록 · 예산 · 과금 돌아보기",
-    icon: "⊕",
-    color: "#a882e8",
-    href: validUrl(process.env.NEXT_PUBLIC_GACHAGUARD_URL),
-  },
-];
-export function AppLauncher({ compact = false }: { compact?: boolean }) {
+export { getOtakuSServices, validUrl };
+
+export function AppLauncher({
+  compact = false,
+  services,
+  onNavigate,
+}: {
+  compact?: boolean;
+  services?: readonly OtakuSService[];
+  onNavigate?: () => void;
+}) {
+  const items = services ?? getOtakuSServices();
   return (
     <div className={`app-launcher ${compact ? "compact-launcher" : ""}`}>
-      {SERVICES.map((s) => {
+      {items.map((s) => {
         const content = (
           <>
             <span
@@ -57,7 +42,7 @@ export function AppLauncher({ compact = false }: { compact?: boolean }) {
             <strong>{s.name}</strong>
             <small>{s.description}</small>
             <span className="service-status">
-              {s.name === "SipSungJang"
+              {s.current
                 ? "◆ 현재 서비스"
                 : s.href
                   ? "서비스 열기 ↗"
@@ -66,24 +51,30 @@ export function AppLauncher({ compact = false }: { compact?: boolean }) {
           </>
         );
         return s.href ? (
-          s.name === "SipSungJang" ? (
-            <Link key={s.name} className="service-card current" href={s.href}>
+          s.current ? (
+            <Link
+              key={s.id}
+              className="service-card current"
+              href={s.href}
+              onClick={onNavigate}
+            >
               {content}
             </Link>
           ) : (
             <a
-              key={s.name}
+              key={s.id}
               className="service-card"
               href={s.href}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={onNavigate}
             >
               {content}
             </a>
           )
         ) : (
           <div
-            key={s.name}
+            key={s.id}
             className="service-card unavailable"
             aria-disabled="true"
           >

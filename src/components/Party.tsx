@@ -154,25 +154,27 @@ function PartyEditor({
       <Panel className="panel-pad">
         <SectionHeader>보유 캐릭터</SectionHeader>
         {chars.length ? (
-          chars.map((c) => (
-            <div className="roster-row" key={c.id}>
-              <span
-                className="character-avatar small"
-                style={{ color: gameColor(game) }}
-              >
-                {c.name.charAt(0)}
-              </span>
-              <div>
-                <strong>{c.name}</strong>
-                <small>
-                  레벨 {c.current_level} · {c.element}
-                </small>
+          <div className="roster-list">
+            {chars.map((c) => (
+              <div className="roster-row" key={c.id}>
+                <span
+                  className="character-avatar small"
+                  style={{ color: gameColor(game) }}
+                >
+                  {c.name.charAt(0)}
+                </span>
+                <div>
+                  <strong>{c.name}</strong>
+                  <small>
+                    레벨 {c.current_level} · {c.element}
+                  </small>
+                </div>
+                <span className={`badge priority-${c.priority_rank}`}>
+                  {PRIORITY_LABELS[c.priority_rank]}
+                </span>
               </div>
-              <span className={`badge priority-${c.priority_rank}`}>
-                {PRIORITY_LABELS[c.priority_rank]}
-              </span>
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
           <p className="hint">
             등록한 캐릭터가 없어요.

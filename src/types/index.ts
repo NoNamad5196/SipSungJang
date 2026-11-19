@@ -93,3 +93,22 @@ export interface UserProfile {
   reset_hour: number;
   reminders: { weekly: boolean; events: boolean; daily: boolean };
 }
+export type AgentSignalKind =
+  | "game_started"
+  | "game_stopped"
+  | "manual_sync"
+  | "spending_alert";
+export type AgentSourceApp = "sipsungjang" | "gachaguard" | "otakuhub";
+export interface AgentSignal {
+  id: string;
+  kind: AgentSignalKind;
+  source_app: AgentSourceApp;
+  game_id: string | null;
+  user_game_id: string | null;
+  occurred_at: string;
+  received_at: string;
+  expires_at: string;
+  message: string | null;
+  amount: number | null;
+  currency: string | null;
+}

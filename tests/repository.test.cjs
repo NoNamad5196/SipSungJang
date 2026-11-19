@@ -4,15 +4,21 @@ const { LocalRepository } = require("../.work/test-build/lib/storage/local");
 const {
   normalizeGame,
   normalizeCharacter,
+  normalizeAgentSignal,
   nextReset,
   defaultProfile,
   percent,
   koreaDate,
 } = require("../.work/test-build/lib/model");
 const {
+  GAME_CATALOG,
   resolveGame,
   toSharedUserGame,
 } = require("../.work/test-build/lib/catalog");
+const {
+  validUrl,
+  getOtakuSServices,
+} = require("../.work/test-build/lib/services");
 const {
   validateBackup,
   prepareCloudBackup,
@@ -294,4 +300,232 @@ test("editing a display name cannot change the shared game identity", async () =
   });
   assert.equal(edited.game_id, "genshin-impact");
   await assert.rejects(repo.createGame(gameInput("GENSHIN IMPACT")), /이미/);
+});
+test("validUrl and getOtakuSServices enforce HTTPS links and ecosystem launcher contract", () => {
+  assert.equal(
+    validUrl("https://otakuhub.example.com"),
+    "https://otakuhub.example.com/",
+  );
+  assert.equal(
+    validUrl("https://gachaguard.example.com/budget"),
+    "https://gachaguard.example.com/budget",
+  );
+  assert.equal(validUrl("http://otakuhub.example.com"), null);
+  assert.equal(validUrl("javascript:alert(1)"), null);
+  assert.equal(validUrl("ftp://example.com"), null);
+  assert.equal(validUrl(""), null);
+  assert.equal(validUrl(undefined), null);
+
+  const services = getOtakuSServices({
+    NEXT_PUBLIC_OTAKUHUB_URL: "https://otakuhub.web.app",
+    NEXT_PUBLIC_GACHAGUARD_URL: "http://insecure.example.com",
+  });
+  assert.equal(services.length, 3);
+  assert.deepEqual(
+    services.map((s) => s.id),
+    ["sipsungjang", "otakuhub", "gachaguard"],
+  );
+  assert.deepEqual(services[0], {
+    id: "sipsungjang",
+    name: "SipSungJang",
+    description: "육성 · 주간 목표 · 플레이 수첩",
+    icon: "✦",
+    color: "#c9a84c",
+    href: "/dashboard",
+    current: true,
+  });
+  assert.equal(services[1].href, "https://otakuhub.web.app/");
+  assert.equal(services[1].current, false);
+  assert.equal(services[2].href, null);
+  assert.equal(services[2].current, false);
+});
+test("normalizeAgentSignal coerces Timestamp/ISO values, filters expired signals, and rejects invalid kinds", () => {
+  const now = new Date("2026-11-19T12:00:00.000Z");
+  const fromIso = normalizeAgentSignal(
+    {
+      kind: "spending_alert",
+      source_app: "gachaguard",
+      game_id: "honkai-star-rail",
+      user_game_id: "honkai-star-rail",
+      occurred_at: "2026-11-19T11:30:00.000Z",
+      received_at: "2026-11-19T11:31:00.000Z",
+      expires_at: "2026-11-20T11:31:00.000Z",
+      message: "월간 예산 85% 도달",
+      amount: 55000.9,
+      currency: "krw",
+    },
+    "sig-1",
+    now,
+  );
+  assert.deepEqual(fromIso, {
+    id: "sig-1",
+    kind: "spending_alert",
+    source_app: "gachaguard",
+    game_id: "honkai-star-rail",
+    user_game_id: "honkai-star-rail",
+    occurred_at: "2026-11-19T11:30:00.000Z",
+    received_at: "2026-11-19T11:31:00.000Z",
+    expires_at: "2026-11-20T11:31:00.000Z",
+    message: "월간 예산 85% 도달",
+    amount: 55000,
+    currency: "KRW",
+  });
+
+  const fakeTimestamp = (iso) => ({ toDate: () => new Date(iso) });
+  const fromTimestamp = normalizeAgentSignal(
+    {
+      id: "sig-ts",
+      kind: "game_started",
+      source_app: "sipsungjang",
+      game_id: "genshin-impact",
+      occurred_at: fakeTimestamp("2026-11-19T11:50:00.000Z"),
+      received_at: { seconds: Math.floor(Date.parse("2026-11-19T11:51:00.000Z") / 1000), nanoseconds: 0 },
+      expires_at: fakeTimestamp("2026-11-19T15:00:00.000Z"),
+    },
+    undefined,
+    now,
+  );
+  assert.equal(fromTimestamp?.id, "sig-ts");
+  assert.equal(fromTimestamp?.kind, "game_started");
+
+  assert.equal(
+    normalizeAgentSignal(
+      {
+        kind: "game_stopped",
+        source_app: "sipsungjang",
+        occurred_at: "2026-11-18T10:00:00.000Z",
+        received_at: "2026-11-18T10:01:00.000Z",
+        expires_at: "2026-11-19T12:00:00.000Z",
+      },
+      "sig-expired",
+      now,
+    ),
+    null,
+  );
+  assert.equal(
+    normalizeAgentSignal(
+      {
+        kind: "unknown_kind",
+        source_app: "otakuhub",
+        occurred_at: "2026-11-19T11:00:00.000Z",
+        received_at: "2026-11-19T11:01:00.000Z",
+        expires_at: "2026-11-20T11:01:00.000Z",
+      },
+      "sig-bad-kind",
+      now,
+    ),
+    null,
+  );
+  assert.equal(
+    normalizeAgentSignal(
+      {
+        kind: "manual_sync",
+        source_app: "invalid_app",
+        occurred_at: "2026-11-19T11:00:00.000Z",
+        received_at: "2026-11-19T11:01:00.000Z",
+        expires_at: "2026-11-20T11:01:00.000Z",
+      },
+      "sig-bad-app",
+      now,
+    ),
+    null,
+  );
+});
+test("LocalRepository.listAgentSignals returns demo preview signals and filters stored local signals without writing", async () => {
+  const localRepo = new LocalRepository();
+  assert.deepEqual(await localRepo.listAgentSignals(), []);
+
+  const demoRepo = new LocalRepository("sipsungjang_demo_v2");
+  const demoSignals = await demoRepo.listAgentSignals();
+  assert.equal(demoSignals.length, 3);
+  assert.equal(localStorage.getItem("sipsungjang_demo_v2_agent_signals"), null);
+
+  const future = new Date(Date.now() + 3600_000).toISOString();
+  const past = new Date(Date.now() - 3600_000).toISOString();
+  localStorage.setItem(
+    "sipsungjang_v2_agent_signals",
+    JSON.stringify([
+      {
+        id: "older",
+        kind: "manual_sync",
+        source_app: "otakuhub",
+        occurred_at: new Date(Date.now() - 600_000).toISOString(),
+        received_at: new Date(Date.now() - 600_000).toISOString(),
+        expires_at: future,
+      },
+      {
+        id: "newer",
+        kind: "game_started",
+        source_app: "sipsungjang",
+        game_id: "genshin-impact",
+        occurred_at: new Date(Date.now() - 60_000).toISOString(),
+        received_at: new Date(Date.now() - 60_000).toISOString(),
+        expires_at: future,
+      },
+      {
+        id: "expired",
+        kind: "game_stopped",
+        source_app: "sipsungjang",
+        occurred_at: past,
+        received_at: past,
+        expires_at: past,
+      },
+    ]),
+  );
+  const stored = await localRepo.listAgentSignals(5);
+  assert.deepEqual(
+    stored.map((s) => s.id),
+    ["newer", "older"],
+  );
+});
+test("toSharedUserGame projects only shared UserGame fields and catalog aligns across OtakuS", () => {
+  assert.deepEqual(
+    GAME_CATALOG.map((g) => g.id),
+    [
+      "genshin-impact",
+      "honkai-star-rail",
+      "wuthering-waves",
+      "blue-archive",
+      "nikke",
+      "arknights",
+      "zenless-zone-zero",
+      "limbus-company",
+    ],
+  );
+  const fullGame = normalizeGame({
+    id: "genshin-impact",
+    user_id: "uid-1",
+    game_id: "genshin-impact",
+    name: "원신",
+    intensity: "main",
+    last_access: "2026-11-19",
+    display_order: 2,
+    created_at: "2026-11-01T00:00:00.000Z",
+    updated_at: "2026-11-19T00:00:00.000Z",
+    next_goal: "나선 36성",
+    memo: "비공개 메모",
+    quests: [{ id: "q1", label: "레진", current: 1, total: 2, type: "daily", done: false, deadline: null }],
+    parties: [{ id: "p1", name: "기본", slots: [null, null], notes: "" }],
+  });
+  const shared = toSharedUserGame(fullGame);
+  assert.deepEqual(Object.keys(shared).sort(), [
+    "created_at",
+    "display_order",
+    "game_id",
+    "id",
+    "intensity",
+    "last_access",
+    "updated_at",
+    "user_id",
+  ]);
+  assert.deepEqual(shared, {
+    id: "genshin-impact",
+    user_id: "uid-1",
+    game_id: "genshin-impact",
+    intensity: "main",
+    last_access: "2026-11-19",
+    display_order: 2,
+    created_at: "2026-11-01T00:00:00.000Z",
+    updated_at: "2026-11-19T00:00:00.000Z",
+  });
 });

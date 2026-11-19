@@ -1,4 +1,9 @@
-import type { Game, Character, UserProfile } from "../../types/index";
+import type {
+  AgentSignal,
+  Character,
+  Game,
+  UserProfile,
+} from "../../types/index";
 import { normalizeGame, normalizeCharacter, normalizeProfile } from "../model";
 export type CreateGameInput = Omit<
   Game,
@@ -25,6 +30,7 @@ export interface IRepository {
   deleteCharacter(id: string): Promise<void>;
   getProfile(): Promise<UserProfile>;
   saveProfile(profile: UserProfile): Promise<void>;
+  listAgentSignals(limit?: number): Promise<AgentSignal[]>;
   exportData(): Promise<BackupData>;
   importData(data: BackupData): Promise<void>;
 }

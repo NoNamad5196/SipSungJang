@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Game, Quest } from "@/types";
@@ -101,6 +101,11 @@ export function QuestRow({
     </div>
   );
 }
+const DETAIL_TABS = ["weekly", "characters", "party", "memo"] as const;
+type DetailTab = (typeof DETAIL_TABS)[number];
+function isDetailTab(value: string | null): value is DetailTab {
+  return DETAIL_TABS.includes(value as DetailTab);
+}
 export function GameQuestPanel({
   game,
   detail = false,
@@ -112,7 +117,43 @@ export function GameQuestPanel({
     { repository } = useSession();
   const done = game.quests.filter((t) => t.done).length,
     color = gameColor(game);
-  const [tab, setTab] = useState("weekly");
+  const [tab, setTab] = useState<DetailTab>("weekly");
+  useEffect(() => {
+    if (!detail) return;
+    let active = true;
+    const syncFromLocation = () => {
+      if (!active) return;
+      const queryTab = new URLSearchParams(window.location.search).get("tab");
+      const hashTab = window.location.hash.replace(/^#/, "");
+      const next = isDetailTab(queryTab)
+        ? queryTab
+        : isDetailTab(hashTab)
+          ? hashTab
+          : "weekly";
+      setTab(next);
+    };
+    const timer = setTimeout(syncFromLocation, 0);
+    window.addEventListener("popstate", syncFromLocation);
+    window.addEventListener("hashchange", syncFromLocation);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      window.removeEventListener("popstate", syncFromLocation);
+      window.removeEventListener("hashchange", syncFromLocation);
+    };
+  }, [detail]);
+  function selectTab(next: DetailTab) {
+    setTab(next);
+    if (!detail || typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (next === "weekly") {
+      url.searchParams.delete("tab");
+    } else {
+      url.searchParams.set("tab", next);
+    }
+    url.hash = "";
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }
   async function resetWeekly() {
     await run(async () => {
       const fresh = await repository.getGame(game.id);
@@ -196,18 +237,21 @@ export function GameQuestPanel({
       </div>
       {detail && (
         <div className="detail-tabs" role="tablist" aria-label="게임 기록">
-          {[
-            ["weekly", "이번 주"],
-            ["characters", "캐릭터"],
-            ["party", "파티"],
-            ["memo", "메모"],
-          ].map(([key, label]) => (
+          {(
+            [
+              ["weekly", "이번 주"],
+              ["characters", "캐릭터"],
+              ["party", "파티"],
+              ["memo", "메모"],
+            ] as const
+          ).map(([key, label]) => (
             <button
               key={key}
+              type="button"
               role="tab"
               aria-selected={tab === key}
               className={tab === key ? "selected" : ""}
-              onClick={() => setTab(key)}
+              onClick={() => selectTab(key)}
             >
               {label}
             </button>

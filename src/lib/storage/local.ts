@@ -1,10 +1,17 @@
-import type { Game, Character, UserProfile } from "../../types/index";
+import type {
+  AgentSignal,
+  Character,
+  Game,
+  UserProfile,
+} from "../../types/index";
 import {
+  normalizeAgentSignal,
   normalizeGame,
   normalizeCharacter,
   normalizeProfile,
   defaultProfile,
 } from "../model";
+import { demoAgentSignals } from "../demo";
 import {
   mergeBackup,
   validateBackup,
@@ -170,6 +177,30 @@ export class LocalRepository implements IRepository {
   }
   async saveProfile(profile: UserProfile) {
     this.write({ ...this.read(), profile: normalizeProfile(profile, "local") });
+  }
+  async listAgentSignals(max = 10): Promise<AgentSignal[]> {
+    const safeLimit = Math.min(50, Math.max(1, Math.trunc(max)));
+    const raw = localStorage.getItem(`${this.key}_agent_signals`);
+    if (raw) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const now = new Date();
+          return parsed
+            .map((item) => normalizeAgentSignal(item, undefined, now))
+            .filter((s): s is AgentSignal => s !== null)
+            .sort(
+              (a, b) => Date.parse(b.received_at) - Date.parse(a.received_at),
+            )
+            .slice(0, safeLimit);
+        }
+      } catch {
+        return [];
+      }
+    }
+    return this.key === "sipsungjang_demo_v2"
+      ? demoAgentSignals().slice(0, safeLimit)
+      : [];
   }
   async exportData() {
     return { ...this.read(), version: 2, exportedAt: new Date().toISOString() };
